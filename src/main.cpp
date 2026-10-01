@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <chrono>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -33,6 +34,9 @@ namespace {
     double g_drawAccumulator = 0.0;
     double g_debugElapsed = 0.0;
     int g_startupCompatibilityCountdown = 90;
+    std::chrono::steady_clock::time_point g_lastDrawGateTick{};
+    bool g_drawGateClockReady = false;
+    int g_consecutiveSkippedDraws = 0;
 
     std::uint64_t g_logicCalls = 0;
     std::uint64_t g_renderCalls = 0;
@@ -70,6 +74,8 @@ namespace {
 
     void resetDrawState() {
         g_drawAccumulator = 0.0;
+        g_drawGateClockReady = false;
+        g_consecutiveSkippedDraws = 0;
     }
 
     bool fastInitWithFormat(
@@ -289,7 +295,13 @@ namespace {
 
 class $modify(DashBoostDirector, cocos2d::CCDirector) {
     void drawScene() {
-        double actualDelta = this->getActualDeltaTime();
+        using Clock = std::chrono::steady_clock;
+        auto now = Clock::now();
+
+        double debugDelta = static_cast<double>(this->getDeltaTime());
+        if (!std::isfinite(debugDelta) || debugDelta <= 0.0) {
+            debugDelta = 0.0;
+        }
 
         if (g_debuggerEnabled) {
             ++g_logicCalls;
@@ -308,29 +320,78 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
         }
 
         if (!dividerActive || this->getTotalFrames() < 150) {
+            g_lastDrawGateTick = now;
+            g_drawGateClockReady = true;
+            g_consecutiveSkippedDraws = 0;
+
             if (g_debuggerEnabled) {
                 ++g_renderCalls;
             }
+
             cocos2d::CCDirector::drawScene();
-            debugTick(actualDelta);
+            debugTick(debugDelta);
             return;
         }
+
+        // iOS does not reliably advance CCDirector::getActualDeltaTime() for
+        // this use case. Use a monotonic wall clock so the render gate can
+        // never get stuck waiting on a stale engine delta.
+        if (!g_drawGateClockReady) {
+            g_lastDrawGateTick = now;
+            g_drawGateClockReady = true;
+
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
+
+            cocos2d::CCDirector::drawScene();
+            debugTick(debugDelta);
+            return;
+        }
+
+        double elapsed = std::chrono::duration<double>(now - g_lastDrawGateTick).count();
+        g_lastDrawGateTick = now;
+
+        if (!std::isfinite(elapsed) || elapsed < 0.0) {
+            resetDrawState();
+            g_lastDrawGateTick = now;
+            g_drawGateClockReady = true;
+
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
+
+            cocos2d::CCDirector::drawScene();
+            debugTick(debugDelta);
+            return;
+        }
+
+        // Ignore giant resume/background gaps instead of dumping them into
+        // the accumulator and producing a burst of strange frame pacing.
+        g_drawAccumulator += std::min(elapsed, 0.25);
 
         double targetDelta = 1.0 / currentTargetFPS();
+        bool sceneSwitchPending = this->getNextScene() != nullptr;
+        bool targetReached = g_drawAccumulator + 1e-9 >= targetDelta;
+        bool starvationGuard = g_consecutiveSkippedDraws >= 8;
 
-        if (std::isfinite(actualDelta) && actualDelta > 0.0) {
-            g_drawAccumulator += actualDelta;
-        }
+        if (targetReached || sceneSwitchPending || starvationGuard) {
+            if (targetReached) {
+                g_drawAccumulator = std::fmod(g_drawAccumulator, targetDelta);
+            }
 
-        if (g_drawAccumulator + 1e-9 >= targetDelta) {
-            g_drawAccumulator = std::fmod(g_drawAccumulator, targetDelta);
+            g_consecutiveSkippedDraws = 0;
+
             if (g_debuggerEnabled) {
                 ++g_renderCalls;
             }
+
             cocos2d::CCDirector::drawScene();
-            debugTick(actualDelta);
+            debugTick(elapsed);
             return;
         }
+
+        ++g_consecutiveSkippedDraws;
 
         if (g_debuggerEnabled) {
             ++g_skippedDraws;
@@ -340,11 +401,7 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             this->getScheduler()->update(this->getDeltaTime());
         }
 
-        if (this->getNextScene()) {
-            this->setNextScene();
-        }
-
-        debugTick(actualDelta);
+        debugTick(elapsed);
     }
 };
 
