@@ -319,7 +319,7 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             wasDividerActive = dividerActive;
         }
 
-        if (!dividerActive || this->getTotalFrames() < 150) {
+        if (!dividerActive) {
             g_lastDrawGateTick = now;
             g_drawGateClockReady = true;
             g_consecutiveSkippedDraws = 0;
