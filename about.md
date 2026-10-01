@@ -17,8 +17,8 @@ When logic is updating faster than your screen can display, DashBoost can skip u
 
 On iOS, the target comes from `UIScreen.maximumFramesPerSecond`.
 
-### CBF-safe behavior
-If Click Between Frames is loaded, the Render Divider portion is automatically bypassed so the two timing systems do not overlap. Fast Format can still run.
+### Compatibility behavior
+If Click Between Frames is loaded, the Render Divider portion is automatically bypassed so the two timing systems do not overlap. If Globed is loaded, DashBoost bypasses its own Fast Format hook because Globed already optimizes the same CCString formatting function.
 
 ## Debugger
 Enable **Debugger** in settings to print live counters once per second. It reports:
