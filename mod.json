@@ -1,0 +1,63 @@
+{
+    "geode": "5.10.1",
+    "gd": {
+        "win": "2.2081",
+        "ios": "2.2081"
+    },
+    "id": "candyzp.dashboost",
+    "name": "DashBoost",
+    "version": "v1.0.0",
+    "developer": "candyzp",
+    "description": "Merged lightweight performance optimizations for Geometry Dash.",
+    "links": {
+        "source": "https://github.com/candyzp/geode-mods"
+    },
+    "tags": [
+        "performance",
+        "offline"
+    ],
+    "settings": {
+        "enabled": {
+            "name": "Enabled",
+            "type": "bool",
+            "default": true,
+            "description": "Master switch. Off bypasses Render Divider and disables the Fast Format hook."
+        },
+        "fast-format": {
+            "name": "Fast Format",
+            "type": "bool",
+            "default": true,
+            "description": "Reduce temporary allocation overhead from Cocos formatted strings.",
+            "enable-if": "enabled"
+        },
+        "render-divider": {
+            "name": "Render Divider",
+            "type": "bool",
+            "default": true,
+            "description": "Render at the display target while allowing faster logic updates.",
+            "enable-if": "enabled"
+        },
+        "override-visual-fps": {
+            "name": "Override Visual FPS",
+            "type": "bool",
+            "default": false,
+            "description": "Use a custom render target instead of the detected display refresh rate.",
+            "enable-if": "enabled && render-divider"
+        },
+        "visual-fps": {
+            "name": "Visual FPS",
+            "type": "int",
+            "default": 60,
+            "min": 1,
+            "max": 360,
+            "description": "Custom visual FPS target.",
+            "enable-if": "enabled && render-divider && override-visual-fps"
+        },
+        "debugger": {
+            "name": "Debugger",
+            "type": "bool",
+            "default": false,
+            "description": "Log live one-second performance counters to the Geode console."
+        }
+    }
+}

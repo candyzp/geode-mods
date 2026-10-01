@@ -1,53 +1,41 @@
-name: Build Geode Mod
+name: Build DashBoost
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - "**"
+      - '**'
+  pull_request:
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        config:
-        - name: Windows
-          os: windows-latest
+        include:
+          - name: Windows
+            os: windows-latest
+            target: Win64
+          - name: iOS
+            os: macos-latest
+            target: iOS
 
-        - name: macOS
-          os: macos-latest
-
-        - name: iOS
-          os: macos-latest
-          target: iOS
-
-        - name: Android32
-          os: ubuntu-latest
-          target: Android32
-
-        - name: Android64
-          os: ubuntu-latest
-          target: Android64
-
-    name: ${{ matrix.config.name }}
-    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build the mod
-        continue-on-error: ${{ matrix.config.name == 'macOS' || matrix.config.name == 'iOS' || matrix.config.name == 'Android32' }}
+      - name: Build
         uses: geode-sdk/build-geode-mod@main
         with:
+          sdk: given
           combine: true
-          target: ${{ matrix.config.target }}
+          target: ${{ matrix.target }}
 
   package:
-    name: Package builds
+    name: Package
     runs-on: ubuntu-latest
-    # run even if one of the platforms fails
-    if: '!cancelled()'
     needs: build
 
     steps:
@@ -56,5 +44,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Build Output
+          name: DashBoost
           path: ${{ steps.build.outputs.build-output }}

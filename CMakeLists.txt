@@ -1,45 +1,36 @@
 cmake_minimum_required(VERSION 3.21)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
-	set(CMAKE_OSX_ARCHITECTURES "arm64")
-else()
-	set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
-endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(geode-mods)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
+    set(CMAKE_OSX_ARCHITECTURES "arm64")
+else()
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+endif()
+
+project(DashBoost VERSION 1.0.0)
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+)
+
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
+    list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/RefreshRateIOS.mm")
+endif()
+
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 if (NOT DEFINED ENV{GEODE_SDK})
-	message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK environment variable to point to Geode")
-else()
-	message(STATUS "Found Geode: $ENV{GEODE_SDK}")
+    message(FATAL_ERROR "Unable to find Geode SDK. Set GEODE_SDK to your Geode SDK path.")
 endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-CPMAddPackage("gh:camila314/uibuilder#04d0075")
-add_subdirectory(nodes)
-
-if (WIN32)
-# 	# add_subdirectory(fast-format)
-	add_subdirectory(draw-divide)
-# 	add_subdirectory(jump-key)
-
-	add_subdirectory(max-window)
-	add_subdirectory(ingame-screenshot)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
+    find_library(UIKIT_FRAMEWORK UIKit)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${UIKIT_FRAMEWORK})
 endif()
 
-add_subdirectory(run-info)
-
-# if (NOT APPLE)
-
-add_subdirectory(scroll-zoom)
-
-# add_subdirectory(physics-btns)
-add_subdirectory(circle-tool)
-add_subdirectory(reference-image)
-# add_subdirectory(song-search)
-add_subdirectory(song-preview)
-
-# endif()
+setup_geode_mod(${PROJECT_NAME})
