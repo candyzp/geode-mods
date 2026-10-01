@@ -13,11 +13,6 @@
 #include <cstdio>
 #include <string_view>
 
-#if defined(GEODE_IS_WINDOWS)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
-
 using namespace geode::prelude;
 
 namespace {
@@ -169,21 +164,6 @@ namespace {
     }
 
     void installFastFormatHook() {
-        void* initAddress = nullptr;
-
-#if defined(GEODE_IS_WINDOWS)
-        HMODULE cocos = GetModuleHandleW(L"libcocos2d.dll");
-
-        if (cocos) {
-            initAddress = reinterpret_cast<void*>(
-                GetProcAddress(
-                    cocos,
-                    "?initWithFormatAndValist@CCString@cocos2d@@AEAA_NPEBDPEAD@Z"
-                )
-            );
-        }
-
-#elif defined(GEODE_IS_IOS)
         static_assert(
             GEODE_COMP_GD_VERSION == 22081,
             "DashBoost iOS CCString hook must be verified for this GD version"
@@ -208,15 +188,9 @@ namespace {
             return;
         }
 
-        initAddress = reinterpret_cast<void*>(
+        auto* initAddress = reinterpret_cast<void*>(
             geode::base::get() + kCCStringInitIOSOffset
         );
-#endif
-
-        if (!initAddress) {
-            log::warn("[DashBoost] CCString::initWithFormatAndValist was not found; Fast Format unavailable");
-            return;
-        }
 
         auto hook = Mod::get()->hook(
             initAddress,
@@ -261,11 +235,7 @@ namespace {
             return;
         }
 
-#if defined(GEODE_IS_IOS)
         bool patchless = Loader::get()->isPatchless();
-#else
-        bool patchless = false;
-#endif
 
         log::info(
             "[DashBoost] {} | enabled={} fast-format={} hook={} render-divider={} target={}Hz geode-cbf={} globed={} patchless={}",
@@ -294,11 +264,7 @@ namespace {
             return;
         }
 
-#if defined(GEODE_IS_IOS)
         bool patchless = Loader::get()->isPatchless();
-#else
-        bool patchless = false;
-#endif
 
         log::info(
             "[DashBoost] 1s | logic={} rendered={} skipped={} format={} format-misses={} target={}Hz divider-active={} geode-cbf={} globed={} patchless={}",
