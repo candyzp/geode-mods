@@ -37,6 +37,9 @@ namespace {
     std::chrono::steady_clock::time_point g_lastDrawGateTick{};
     bool g_drawGateClockReady = false;
     int g_consecutiveSkippedDraws = 0;
+    cocos2d::CCScene* g_lastRunningScene = nullptr;
+    bool g_lastDirectorPaused = false;
+    bool g_directorStateInitialized = false;
 
     std::uint64_t g_logicCalls = 0;
     std::uint64_t g_renderCalls = 0;
@@ -76,6 +79,12 @@ namespace {
         g_drawAccumulator = 0.0;
         g_drawGateClockReady = false;
         g_consecutiveSkippedDraws = 0;
+    }
+
+    void syncDirectorState(cocos2d::CCDirector* director) {
+        g_lastRunningScene = director->getRunningScene();
+        g_lastDirectorPaused = director->isPaused();
+        g_directorStateInitialized = true;
     }
 
     bool fastInitWithFormat(
@@ -316,7 +325,38 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
 
         if (dividerActive != wasDividerActive) {
             resetDrawState();
+            syncDirectorState(this);
             wasDividerActive = dividerActive;
+        }
+
+        auto* runningScene = this->getRunningScene();
+        bool directorPaused = this->isPaused();
+
+        if (!g_directorStateInitialized) {
+            syncDirectorState(this);
+        }
+
+        bool sceneChanged = runningScene != g_lastRunningScene;
+        bool pauseChanged = directorPaused != g_lastDirectorPaused;
+
+        if (sceneChanged || pauseChanged) {
+            resetDrawState();
+            syncDirectorState(this);
+
+            if (g_debuggerEnabled) {
+                log::info(
+                    "[DashBoost] draw state reset | scene-changed={} pause-changed={}",
+                    sceneChanged,
+                    pauseChanged
+                );
+                ++g_renderCalls;
+            }
+
+            g_lastDrawGateTick = now;
+            g_drawGateClockReady = true;
+            cocos2d::CCDirector::drawScene();
+            debugTick(debugDelta);
+            return;
         }
 
         if (!dividerActive) {
@@ -375,7 +415,22 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
         bool targetReached = g_drawAccumulator + 1e-9 >= targetDelta;
         bool starvationGuard = g_consecutiveSkippedDraws >= 8;
 
-        if (targetReached || sceneSwitchPending || starvationGuard) {
+        if (sceneSwitchPending) {
+            resetDrawState();
+            syncDirectorState(this);
+            g_lastDrawGateTick = now;
+            g_drawGateClockReady = true;
+
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
+
+            cocos2d::CCDirector::drawScene();
+            debugTick(elapsed);
+            return;
+        }
+
+        if (targetReached || starvationGuard) {
             if (targetReached) {
                 g_drawAccumulator = std::fmod(g_drawAccumulator, targetDelta);
             }
