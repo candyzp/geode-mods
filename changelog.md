@@ -8,7 +8,9 @@
 - Added iOS arm64 support.
 - Added native iOS refresh-rate detection.
 - Added CBF-safe Render Divider behavior.
+- Added Globed-safe Fast Format bypass to avoid double-hooking the same CCString path.
 - Added a real master Enabled toggle.
 - Added live Debugger counters.
+- Switched Fast Format to the current 2.2081 `CCString::initWithFormatAndValist` hook path.
 - Fixed the old Fast Format varargs handling by avoiding reuse of a consumed va_list.
 - Reworked formatting to use a small stack fast path with exact-size fallback.
