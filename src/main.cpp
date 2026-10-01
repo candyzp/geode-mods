@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <string_view>
 
 #if defined(GEODE_IS_WINDOWS)
 #define WIN32_LEAN_AND_MEAN
@@ -21,6 +22,8 @@
 using namespace geode::prelude;
 
 namespace {
+    constexpr std::uintptr_t kCCStringInitIOSOffset = 0x268bbc;
+
     bool g_enabled = true;
     bool g_fastFormatEnabled = true;
     bool g_renderDividerEnabled = true;
@@ -30,6 +33,7 @@ namespace {
 
     geode::Hook* g_fastFormatHook = nullptr;
     bool g_fastFormatInstalled = false;
+    bool g_globedLoaded = false;
 
     double g_drawAccumulator = 0.0;
     double g_debugElapsed = 0.0;
@@ -41,6 +45,10 @@ namespace {
 
     bool isCBFLoaded() {
         return Loader::get()->isModLoaded("syzzi.click_between_frames");
+    }
+
+    bool isGlobedLoaded() {
+        return Loader::get()->isModLoaded("dankmeme.globed2");
     }
 
     double currentTargetFPS() {
@@ -59,13 +67,36 @@ namespace {
         return g_enabled && g_renderDividerEnabled && !isCBFLoaded();
     }
 
+    bool fastFormatActive() {
+        return g_enabled && g_fastFormatEnabled && !g_globedLoaded;
+    }
+
     void resetDrawState() {
         g_drawAccumulator = 0.0;
     }
 
-    bool assignFormatted(cocos2d::CCString* self, char const* format, va_list args) {
+    bool fastInitWithFormat(
+        cocos2d::CCString* self,
+        char const* format,
+        va_list args
+    ) {
         if (!self || !format) {
             return false;
+        }
+
+        ++g_formatCalls;
+
+        std::string_view formatView{format};
+
+        if (formatView == "%i" || formatView == "%d") {
+            va_list copy;
+            va_copy(copy, args);
+            int value = va_arg(copy, int);
+            va_end(copy);
+
+            fmt::format_int formatted{value};
+            self->m_sString = gd::string(formatted.data(), formatted.size());
+            return true;
         }
 
         std::array<char, 512> stackBuffer{};
@@ -109,86 +140,98 @@ namespace {
         return true;
     }
 
-    cocos2d::CCString* fastCreateWithFormat(char const* format, ...) {
-        auto* result = cocos2d::CCString::create("");
-
-        va_list args;
-        va_start(args, format);
-        bool formatted = assignFormatted(result, format, args);
-        va_end(args);
-
-        g_formatCalls.fetch_add(1, std::memory_order_relaxed);
-
-        if (!formatted) {
-            result->m_sString = "";
-        }
-
-        return result;
-    }
-
     void setFastFormatHookState() {
         if (!g_fastFormatHook) {
             return;
         }
 
-        bool shouldEnable = g_enabled && g_fastFormatEnabled;
-        auto result = g_fastFormatHook->toggle(shouldEnable);
+        auto result = g_fastFormatHook->toggle(fastFormatActive());
 
         if (result.isErr() && g_debuggerEnabled) {
             log::warn("[DashBoost] Failed to toggle Fast Format hook");
         }
     }
 
+    void refreshCompatibilityState() {
+        bool globedLoaded = isGlobedLoaded();
+
+        if (globedLoaded != g_globedLoaded) {
+            g_globedLoaded = globedLoaded;
+            setFastFormatHookState();
+
+            if (g_debuggerEnabled) {
+                log::info(
+                    "[DashBoost] Globed compatibility changed: {}",
+                    g_globedLoaded ? "Fast Format bypassed" : "Fast Format available"
+                );
+            }
+        }
+    }
+
     void installFastFormatHook() {
+        void* initAddress = nullptr;
+
 #if defined(GEODE_IS_WINDOWS)
         HMODULE cocos = GetModuleHandleW(L"libcocos2d.dll");
-        if (!cocos) {
-            log::warn("[DashBoost] libcocos2d.dll was not found; Fast Format unavailable");
+
+        if (cocos) {
+            initAddress = reinterpret_cast<void*>(
+                GetProcAddress(
+                    cocos,
+                    "?initWithFormatAndValist@CCString@cocos2d@@AEAA_NPEBDPEAD@Z"
+                )
+            );
+        }
+
+#elif defined(GEODE_IS_IOS)
+        static_assert(
+            GEODE_COMP_GD_VERSION == 22081,
+            "DashBoost iOS CCString hook must be verified for this GD version"
+        );
+
+        if (Loader::get()->isPatchless()) {
+            auto hook = GEODE_MOD_STATIC_HOOK(
+                kCCStringInitIOSOffset,
+                &fastInitWithFormat,
+                cocos2d::CCString::initWithFormatAndValist
+            );
+
+            if (hook.isOk()) {
+                g_fastFormatHook = hook.unwrap();
+                g_fastFormatHook->setPriority(Priority::Replace);
+                g_fastFormatInstalled = true;
+            }
+            else {
+                log::warn("[DashBoost] Failed to install patchless iOS Fast Format hook");
+            }
+
             return;
         }
 
-        auto address = reinterpret_cast<void*>(
-            GetProcAddress(
-                cocos,
-                "?createWithFormat@CCString@cocos2d@@SAPEAV12@PEBDZZ"
-            )
+        initAddress = reinterpret_cast<void*>(
+            geode::base::get() + kCCStringInitIOSOffset
         );
+#endif
 
-        if (!address) {
-            log::warn("[DashBoost] CCString::createWithFormat export was not found; Fast Format unavailable");
+        if (!initAddress) {
+            log::warn("[DashBoost] CCString::initWithFormatAndValist was not found; Fast Format unavailable");
             return;
         }
 
         auto hook = Mod::get()->hook(
-            address,
-            &fastCreateWithFormat,
-            "cocos2d::CCString::createWithFormat",
-            tulip::hook::TulipConvention::Cdecl
+            initAddress,
+            &fastInitWithFormat,
+            "cocos2d::CCString::initWithFormatAndValist"
         );
 
         if (hook.isOk()) {
             g_fastFormatHook = hook.unwrap();
+            g_fastFormatHook->setPriority(Priority::Replace);
             g_fastFormatInstalled = true;
         }
         else {
             log::warn("[DashBoost] Failed to install Fast Format hook");
         }
-
-#elif defined(GEODE_IS_IOS)
-        auto hook = GEODE_MOD_STATIC_HOOK(
-            0x2680c0,
-            &fastCreateWithFormat,
-            cocos2d::CCString::createWithFormat
-        );
-
-        if (hook.isOk()) {
-            g_fastFormatHook = hook.unwrap();
-            g_fastFormatInstalled = true;
-        }
-        else {
-            log::warn("[DashBoost] Failed to install iOS Fast Format hook");
-        }
-#endif
     }
 
     void readSettings() {
@@ -224,7 +267,7 @@ namespace {
 #endif
 
         log::info(
-            "[DashBoost] {} | enabled={} fast-format={} hook={} render-divider={} target={}Hz cbf={} patchless={}",
+            "[DashBoost] {} | enabled={} fast-format={} hook={} render-divider={} target={}Hz cbf={} globed={} patchless={}",
             reason,
             g_enabled,
             g_fastFormatEnabled,
@@ -232,6 +275,7 @@ namespace {
             g_renderDividerEnabled,
             currentTargetFPS(),
             isCBFLoaded(),
+            g_globedLoaded,
             patchless
         );
     }
@@ -256,7 +300,7 @@ namespace {
 #endif
 
         log::info(
-            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} target={}Hz divider-active={} cbf={} patchless={}",
+            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} target={}Hz divider-active={} cbf={} globed={} patchless={}",
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
@@ -264,6 +308,7 @@ namespace {
             currentTargetFPS(),
             renderDividerActive(),
             isCBFLoaded(),
+            g_globedLoaded,
             patchless
         );
 
@@ -278,6 +323,10 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
     void drawScene() {
         double actualDelta = this->getActualDeltaTime();
         ++g_logicCalls;
+
+        if ((this->getTotalFrames() % 120) == 0) {
+            refreshCompatibilityState();
+        }
 
         static bool wasDividerActive = false;
         bool dividerActive = renderDividerActive();
@@ -324,6 +373,8 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
 
 $on_mod(Loaded) {
     readSettings();
+    g_globedLoaded = isGlobedLoaded();
+
     installFastFormatHook();
     setFastFormatHookState();
 
@@ -361,7 +412,9 @@ $on_mod(Loaded) {
     listenForSettingChanges<bool>("debugger", [](bool value) {
         g_debuggerEnabled = value;
         resetDebugCounters();
+
         if (value) {
+            refreshCompatibilityState();
             logStatus("debugger enabled");
         }
     });
