@@ -14,4 +14,5 @@
 - Cached compatibility checks so normal gameplay does not query the Geode loader every frame.
 - Switched Fast Format to the current 2.2081 `CCString::initWithFormatAndValist` hook path.
 - Fixed the old Fast Format varargs handling by avoiding reuse of a consumed va_list.
-- Reworked formatting to use a small stack fast path with exact-size fallback.
+- Reworked formatting to use a strict 512-byte stack fast path with no heap-backed fallback.
+- Added a Debugger `format-misses` counter for formats that exceed the strict path.
