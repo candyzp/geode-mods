@@ -7,10 +7,11 @@
 - Added Windows x64 support for the Fast Format hook.
 - Added iOS arm64 support.
 - Added native iOS refresh-rate detection.
-- Added CBF-safe Render Divider behavior.
+- Added compatibility bypass for the Geode Click Between Frames mod while allowing RobTop's built-in Click Between Steps to remain enabled.
 - Added Globed-safe Fast Format bypass to avoid double-hooking the same CCString path.
 - Added a real master Enabled toggle.
-- Added live Debugger counters.
+- Added live Debugger counters with zero counter overhead while Debugger is disabled.
+- Cached compatibility checks so normal gameplay does not query the Geode loader every frame.
 - Switched Fast Format to the current 2.2081 `CCString::initWithFormatAndValist` hook path.
 - Fixed the old Fast Format varargs handling by avoiding reuse of a consumed va_list.
 - Reworked formatting to use a small stack fast path with exact-size fallback.
