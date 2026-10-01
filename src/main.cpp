@@ -38,6 +38,7 @@ namespace {
 
     double g_drawAccumulator = 0.0;
     double g_debugElapsed = 0.0;
+    int g_startupCompatibilityCountdown = 90;
 
     std::uint64_t g_logicCalls = 0;
     std::uint64_t g_renderCalls = 0;
@@ -156,18 +157,25 @@ namespace {
     }
 
     void refreshCompatibilityState() {
+        bool externalCBFLoaded = isExternalCBFLoaded();
         bool globedLoaded = isGlobedLoaded();
 
-        if (globedLoaded != g_globedLoaded) {
-            g_globedLoaded = globedLoaded;
-            setFastFormatHookState();
+        bool cbfChanged = externalCBFLoaded != g_externalCBFLoaded;
+        bool globedChanged = globedLoaded != g_globedLoaded;
 
-            if (g_debuggerEnabled) {
-                log::info(
-                    "[DashBoost] Globed compatibility changed: {}",
-                    g_globedLoaded ? "Fast Format bypassed" : "Fast Format available"
-                );
-            }
+        g_externalCBFLoaded = externalCBFLoaded;
+        g_globedLoaded = globedLoaded;
+
+        if (globedChanged) {
+            setFastFormatHookState();
+        }
+
+        if (g_debuggerEnabled && (cbfChanged || globedChanged)) {
+            log::info(
+                "[DashBoost] compatibility refreshed | geode-cbf={} globed={}",
+                g_externalCBFLoaded,
+                g_globedLoaded
+            );
         }
     }
 
@@ -270,7 +278,7 @@ namespace {
 #endif
 
         log::info(
-            "[DashBoost] {} | enabled={} fast-format={} hook={} render-divider={} target={}Hz cbf={} globed={} patchless={}",
+            "[DashBoost] {} | enabled={} fast-format={} hook={} render-divider={} target={}Hz geode-cbf={} globed={} patchless={}",
             reason,
             g_enabled,
             g_fastFormatEnabled,
@@ -303,7 +311,7 @@ namespace {
 #endif
 
         log::info(
-            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} target={}Hz divider-active={} cbf={} globed={} patchless={}",
+            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} target={}Hz divider-active={} geode-cbf={} globed={} patchless={}",
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
@@ -328,6 +336,10 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
 
         if (g_debuggerEnabled) {
             ++g_logicCalls;
+        }
+
+        if (g_startupCompatibilityCountdown > 0 && --g_startupCompatibilityCountdown == 0) {
+            refreshCompatibilityState();
         }
 
         static bool wasDividerActive = false;
