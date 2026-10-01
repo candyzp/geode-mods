@@ -29,6 +29,7 @@ namespace {
     bool g_renderDividerEnabled = true;
     bool g_overrideVisualFPS = false;
     bool g_debuggerEnabled = false;
+    bool g_externalCBFLoaded = false;
     int g_visualFPS = 60;
 
     geode::Hook* g_fastFormatHook = nullptr;
@@ -43,7 +44,7 @@ namespace {
     std::uint64_t g_skippedDraws = 0;
     std::atomic_uint64_t g_formatCalls{0};
 
-    bool isCBFLoaded() {
+    bool isExternalCBFLoaded() {
         return Loader::get()->isModLoaded("syzzi.click_between_frames");
     }
 
@@ -64,7 +65,7 @@ namespace {
     }
 
     bool renderDividerActive() {
-        return g_enabled && g_renderDividerEnabled && !isCBFLoaded();
+        return g_enabled && g_renderDividerEnabled && !g_externalCBFLoaded;
     }
 
     bool fastFormatActive() {
@@ -84,7 +85,9 @@ namespace {
             return false;
         }
 
-        ++g_formatCalls;
+        if (g_debuggerEnabled) {
+            g_formatCalls.fetch_add(1, std::memory_order_relaxed);
+        }
 
         std::string_view formatView{format};
 
@@ -274,7 +277,7 @@ namespace {
             g_fastFormatInstalled && g_fastFormatHook && g_fastFormatHook->isEnabled(),
             g_renderDividerEnabled,
             currentTargetFPS(),
-            isCBFLoaded(),
+            g_externalCBFLoaded,
             g_globedLoaded,
             patchless
         );
@@ -307,7 +310,7 @@ namespace {
             g_formatCalls.exchange(0, std::memory_order_relaxed),
             currentTargetFPS(),
             renderDividerActive(),
-            isCBFLoaded(),
+            g_externalCBFLoaded,
             g_globedLoaded,
             patchless
         );
@@ -322,10 +325,9 @@ namespace {
 class $modify(DashBoostDirector, cocos2d::CCDirector) {
     void drawScene() {
         double actualDelta = this->getActualDeltaTime();
-        ++g_logicCalls;
 
-        if ((this->getTotalFrames() % 120) == 0) {
-            refreshCompatibilityState();
+        if (g_debuggerEnabled) {
+            ++g_logicCalls;
         }
 
         static bool wasDividerActive = false;
@@ -337,7 +339,9 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
         }
 
         if (!dividerActive || this->getTotalFrames() < 150) {
-            ++g_renderCalls;
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
             cocos2d::CCDirector::drawScene();
             debugTick(actualDelta);
             return;
@@ -351,13 +355,17 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
 
         if (g_drawAccumulator + 1e-9 >= targetDelta) {
             g_drawAccumulator = std::fmod(g_drawAccumulator, targetDelta);
-            ++g_renderCalls;
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
             cocos2d::CCDirector::drawScene();
             debugTick(actualDelta);
             return;
         }
 
-        ++g_skippedDraws;
+        if (g_debuggerEnabled) {
+            ++g_skippedDraws;
+        }
 
         if (!this->isPaused()) {
             this->getScheduler()->update(this->getDeltaTime());
@@ -373,6 +381,7 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
 
 $on_mod(Loaded) {
     readSettings();
+    g_externalCBFLoaded = isExternalCBFLoaded();
     g_globedLoaded = isGlobedLoaded();
 
     installFastFormatHook();
