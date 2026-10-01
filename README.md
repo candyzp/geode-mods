@@ -2,7 +2,7 @@
 
 DashBoost is a small Geometry Dash performance mod for Geode that combines and modernizes two optimizations from matcool/geode-mods:
 
-- **Fast Format**: replaces the oversized temporary buffer path used by `CCString::createWithFormat` with a 512-byte stack fast path and an exact-size fallback.
+- **Fast Format**: replaces the oversized temporary buffer path with a strict 512-byte stack fast path. There is intentionally no heap-backed fallback.
 - **Render Divider**: lets game logic update faster than the display while rendering only at the display refresh rate.
 
 This fork has been rebuilt as one mod instead of a collection.
@@ -23,7 +23,7 @@ On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target
 - **Render Divider**: toggles render throttling.
 - **Override Visual FPS**: use a custom visual FPS instead of the detected display refresh rate.
 - **Visual FPS**: custom render target when override is enabled.
-- **Debugger**: logs one-second counters so you can verify rendered frames, skipped draws, format calls, target FPS, CBF detection, and iOS patchless state.
+- **Debugger**: logs one-second counters so you can verify rendered frames, skipped draws, format calls, **format misses**, target FPS, CBF detection, and iOS patchless state.
 
 ## CBF compatibility
 
