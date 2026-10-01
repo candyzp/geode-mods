@@ -11,7 +11,6 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
-#include <string>
 #include <string_view>
 
 #if defined(GEODE_IS_WINDOWS)
@@ -44,6 +43,7 @@ namespace {
     std::uint64_t g_renderCalls = 0;
     std::uint64_t g_skippedDraws = 0;
     std::atomic_uint64_t g_formatCalls{0};
+    std::atomic_uint64_t g_formatMisses{0};
 
     bool isExternalCBFLoaded() {
         return Loader::get()->isModLoaded("syzzi.click_between_frames");
@@ -124,24 +124,13 @@ namespace {
             return true;
         }
 
-        std::string dynamicBuffer(static_cast<std::size_t>(required) + 1, '\0');
-
-        va_list secondPass;
-        va_copy(secondPass, args);
-        int written = std::vsnprintf(
-            dynamicBuffer.data(),
-            dynamicBuffer.size(),
-            format,
-            secondPass
-        );
-        va_end(secondPass);
-
-        if (written < 0) {
-            return false;
+        if (g_debuggerEnabled) {
+            g_formatMisses.fetch_add(1, std::memory_order_relaxed);
         }
 
-        self->m_sString = dynamicBuffer.c_str();
-        return true;
+        // Strict mode by design: no heap-backed fallback.
+        // Returning false exposes formats that do not fit the fast path.
+        return false;
     }
 
     void setFastFormatHookState() {
@@ -264,6 +253,7 @@ namespace {
         g_renderCalls = 0;
         g_skippedDraws = 0;
         g_formatCalls.store(0, std::memory_order_relaxed);
+        g_formatMisses.store(0, std::memory_order_relaxed);
     }
 
     void logStatus(char const* reason) {
@@ -311,11 +301,12 @@ namespace {
 #endif
 
         log::info(
-            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} target={}Hz divider-active={} geode-cbf={} globed={} patchless={}",
+            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} format-misses={} target={}Hz divider-active={} geode-cbf={} globed={} patchless={}",
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
             g_formatCalls.exchange(0, std::memory_order_relaxed),
+            g_formatMisses.exchange(0, std::memory_order_relaxed),
             currentTargetFPS(),
             renderDividerActive(),
             g_externalCBFLoaded,
