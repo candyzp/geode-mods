@@ -14,7 +14,7 @@ This fork has been rebuilt as one mod instead of a collection.
 - Windows x64
 - iOS arm64, including modern Geode iOS builds
 
-On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target. The Fast Format hook uses the 2.2081 iOS Cocos offset documented in the current Geode bindings.
+On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target. The Fast Format hook uses the current Geometry Dash 2.2081 `CCString::initWithFormatAndValist` path, including Geode's patchless static-hook route on iOS.
 
 ## Settings
 
@@ -27,7 +27,7 @@ On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target
 
 ## CBF compatibility
 
-If `syzzi.click_between_frames` is loaded, DashBoost automatically bypasses Render Divider to avoid overlapping frame/timing behavior. Fast Format remains available.
+If `syzzi.click_between_frames` is loaded, DashBoost automatically bypasses Render Divider to avoid overlapping frame/timing behavior. If Globed (`dankmeme.globed2`) is loaded, DashBoost bypasses its own Fast Format hook because Globed already replaces the same CCString formatting path.
 
 ## Credits
 
