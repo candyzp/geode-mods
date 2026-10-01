@@ -37,6 +37,10 @@ namespace {
     std::chrono::steady_clock::time_point g_lastDrawGateTick{};
     bool g_drawGateClockReady = false;
     int g_consecutiveSkippedDraws = 0;
+    double g_sourceIntervalEMA = 0.0;
+    bool g_cadenceNeedsDividing = false;
+    int g_fastCadenceSamples = 0;
+    int g_normalCadenceSamples = 0;
     cocos2d::CCScene* g_lastRunningScene = nullptr;
     bool g_lastDirectorPaused = false;
     bool g_directorStateInitialized = false;
@@ -79,6 +83,10 @@ namespace {
         g_drawAccumulator = 0.0;
         g_drawGateClockReady = false;
         g_consecutiveSkippedDraws = 0;
+        g_sourceIntervalEMA = 0.0;
+        g_cadenceNeedsDividing = false;
+        g_fastCadenceSamples = 0;
+        g_normalCadenceSamples = 0;
     }
 
     void syncDirectorState(cocos2d::CCDirector* director) {
@@ -282,7 +290,7 @@ namespace {
         bool patchless = Loader::get()->isPatchless();
 
         log::info(
-            "[DashBoost] 1s | logic={} rendered={} skipped={} format={} format-misses={} target={}Hz divider-active={} geode-cbf={} globed={} patchless={}",
+            "[DashBoost] 1s | draw-calls={} rendered={} skipped={} format={} format-misses={} target={}Hz divider-enabled={} cadence-dividing={} source-fps={} geode-cbf={} globed={} patchless={}",
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
@@ -290,6 +298,8 @@ namespace {
             g_formatMisses.exchange(0, std::memory_order_relaxed),
             currentTargetFPS(),
             renderDividerActive(),
+            g_cadenceNeedsDividing,
+            g_sourceIntervalEMA > 0.0 ? (1.0 / g_sourceIntervalEMA) : 0.0,
             g_externalCBFLoaded,
             g_globedLoaded,
             patchless
@@ -406,14 +416,8 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             return;
         }
 
-        // Ignore giant resume/background gaps instead of dumping them into
-        // the accumulator and producing a burst of strange frame pacing.
-        g_drawAccumulator += std::min(elapsed, 0.25);
-
         double targetDelta = 1.0 / currentTargetFPS();
         bool sceneSwitchPending = this->getNextScene() != nullptr;
-        bool targetReached = g_drawAccumulator + 1e-9 >= targetDelta;
-        bool starvationGuard = g_consecutiveSkippedDraws >= 8;
 
         if (sceneSwitchPending) {
             resetDrawState();
@@ -429,6 +433,79 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             debugTick(elapsed);
             return;
         }
+
+        // Learn the real incoming draw cadence. On a 60 Hz iPhone, drawScene
+        // normally arrives at about 60 Hz already. In that case there are no
+        // redundant visual frames to remove, so dividing would create stutter.
+        if (elapsed > 0.0 && elapsed <= 0.25) {
+            if (g_sourceIntervalEMA <= 0.0) {
+                g_sourceIntervalEMA = elapsed;
+            }
+            else {
+                constexpr double kCadenceSmoothing = 0.10;
+                g_sourceIntervalEMA =
+                    (g_sourceIntervalEMA * (1.0 - kCadenceSmoothing)) +
+                    (elapsed * kCadenceSmoothing);
+            }
+        }
+
+        // Enter divide mode only when the source is clearly faster than the
+        // display target. Require several samples so one short/jittery frame
+        // cannot make DashBoost throw away a useful display frame.
+        constexpr double kEnterDivideRatio = 0.80;
+        constexpr double kExitDivideRatio = 0.92;
+        constexpr int kCadenceConfirmSamples = 8;
+
+        if (!g_cadenceNeedsDividing) {
+            if (g_sourceIntervalEMA > 0.0 &&
+                g_sourceIntervalEMA < targetDelta * kEnterDivideRatio) {
+                ++g_fastCadenceSamples;
+            }
+            else {
+                g_fastCadenceSamples = 0;
+            }
+
+            if (g_fastCadenceSamples >= kCadenceConfirmSamples) {
+                g_cadenceNeedsDividing = true;
+                g_normalCadenceSamples = 0;
+                g_drawAccumulator = 0.0;
+            }
+        }
+        else {
+            if (g_sourceIntervalEMA >= targetDelta * kExitDivideRatio) {
+                ++g_normalCadenceSamples;
+            }
+            else {
+                g_normalCadenceSamples = 0;
+            }
+
+            if (g_normalCadenceSamples >= kCadenceConfirmSamples) {
+                g_cadenceNeedsDividing = false;
+                g_fastCadenceSamples = 0;
+                g_drawAccumulator = 0.0;
+                g_consecutiveSkippedDraws = 0;
+            }
+        }
+
+        if (!g_cadenceNeedsDividing) {
+            g_drawAccumulator = 0.0;
+            g_consecutiveSkippedDraws = 0;
+
+            if (g_debuggerEnabled) {
+                ++g_renderCalls;
+            }
+
+            cocos2d::CCDirector::drawScene();
+            debugTick(elapsed);
+            return;
+        }
+
+        // We have confirmed that drawScene is arriving materially faster than
+        // the display target, so only now is it safe to remove redundant draws.
+        g_drawAccumulator += std::min(elapsed, 0.25);
+
+        bool targetReached = g_drawAccumulator + 1e-9 >= targetDelta;
+        bool starvationGuard = g_consecutiveSkippedDraws >= 8;
 
         if (targetReached || starvationGuard) {
             if (targetReached) {
