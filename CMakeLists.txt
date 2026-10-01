@@ -3,20 +3,21 @@ cmake_minimum_required(VERSION 3.21)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_OSX_ARCHITECTURES "arm64")
 
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
-    set(CMAKE_OSX_ARCHITECTURES "arm64")
+project(DashBoost VERSION 1.0.0 LANGUAGES C CXX OBJCXX)
+
+if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" AND NOT IOS)
+    message(FATAL_ERROR "DashBoost is iOS-only.")
 endif()
-
-project(DashBoost VERSION 1.0.0)
 
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
-    list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/RefreshRateIOS.mm")
-endif()
+list(APPEND SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/RefreshRateIOS.mm"
+)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
@@ -26,9 +27,7 @@ endif()
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
-    find_library(UIKIT_FRAMEWORK UIKit)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${UIKIT_FRAMEWORK})
-endif()
+find_library(UIKIT_FRAMEWORK UIKit REQUIRED)
+target_link_libraries(${PROJECT_NAME} ${UIKIT_FRAMEWORK})
 
 setup_geode_mod(${PROJECT_NAME})
