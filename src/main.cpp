@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
@@ -36,7 +37,7 @@ namespace {
     std::uint64_t g_logicCalls = 0;
     std::uint64_t g_renderCalls = 0;
     std::uint64_t g_skippedDraws = 0;
-    std::uint64_t g_formatCalls = 0;
+    std::atomic_uint64_t g_formatCalls{0};
 
     bool isCBFLoaded() {
         return Loader::get()->isModLoaded("syzzi.click_between_frames");
@@ -116,7 +117,7 @@ namespace {
         bool formatted = assignFormatted(result, format, args);
         va_end(args);
 
-        ++g_formatCalls;
+        g_formatCalls.fetch_add(1, std::memory_order_relaxed);
 
         if (!formatted) {
             result->m_sString = "";
@@ -208,7 +209,7 @@ namespace {
         g_logicCalls = 0;
         g_renderCalls = 0;
         g_skippedDraws = 0;
-        g_formatCalls = 0;
+        g_formatCalls.store(0, std::memory_order_relaxed);
     }
 
     void logStatus(char const* reason) {
@@ -259,7 +260,7 @@ namespace {
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
-            g_formatCalls,
+            g_formatCalls.exchange(0, std::memory_order_relaxed),
             currentTargetFPS(),
             renderDividerActive(),
             isCBFLoaded(),
@@ -270,7 +271,6 @@ namespace {
         g_logicCalls = 0;
         g_renderCalls = 0;
         g_skippedDraws = 0;
-        g_formatCalls = 0;
     }
 }
 
