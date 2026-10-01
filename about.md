@@ -18,7 +18,7 @@ When logic is updating faster than your screen can display, DashBoost can skip u
 On iOS, the target comes from `UIScreen.maximumFramesPerSecond`.
 
 ### Compatibility behavior
-If Click Between Frames is loaded, the Render Divider portion is automatically bypassed so the two timing systems do not overlap. If Globed is loaded, DashBoost bypasses its own Fast Format hook because Globed already optimizes the same CCString formatting function.
+If the Geode Click Between Frames mod is loaded, the Render Divider portion is automatically bypassed so the two timing systems do not overlap. RobTop's built-in Click Between Steps setting is not treated as a conflict and can remain enabled. If Globed is loaded, DashBoost bypasses its own Fast Format hook because Globed already optimizes the same CCString formatting function.
 
 ## Debugger
 Enable **Debugger** in settings to print live counters once per second. It reports:
