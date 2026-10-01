@@ -39,8 +39,8 @@ namespace {
     int g_consecutiveSkippedDraws = 0;
     double g_sourceIntervalEMA = 0.0;
     bool g_cadenceNeedsDividing = false;
-    int g_fastCadenceSamples = 0;
-    int g_normalCadenceSamples = 0;
+    double g_fastCadenceDuration = 0.0;
+    double g_normalCadenceDuration = 0.0;
     cocos2d::CCScene* g_lastRunningScene = nullptr;
     bool g_lastDirectorPaused = false;
     bool g_directorStateInitialized = false;
@@ -48,6 +48,7 @@ namespace {
     std::uint64_t g_logicCalls = 0;
     std::uint64_t g_renderCalls = 0;
     std::uint64_t g_skippedDraws = 0;
+    std::uint64_t g_stateResets = 0;
     std::atomic_uint64_t g_formatCalls{0};
     std::atomic_uint64_t g_formatMisses{0};
 
@@ -85,8 +86,8 @@ namespace {
         g_consecutiveSkippedDraws = 0;
         g_sourceIntervalEMA = 0.0;
         g_cadenceNeedsDividing = false;
-        g_fastCadenceSamples = 0;
-        g_normalCadenceSamples = 0;
+        g_fastCadenceDuration = 0.0;
+        g_normalCadenceDuration = 0.0;
     }
 
     void syncDirectorState(cocos2d::CCDirector* director) {
@@ -249,6 +250,8 @@ namespace {
         g_logicCalls = 0;
         g_renderCalls = 0;
         g_skippedDraws = 0;
+        g_stateResets = 0;
+        g_stateResets = 0;
         g_formatCalls.store(0, std::memory_order_relaxed);
         g_formatMisses.store(0, std::memory_order_relaxed);
     }
@@ -290,10 +293,11 @@ namespace {
         bool patchless = Loader::get()->isPatchless();
 
         log::info(
-            "[DashBoost] 1s | draw-calls={} rendered={} skipped={} format={} format-misses={} target={}Hz divider-enabled={} cadence-dividing={} source-fps={} geode-cbf={} globed={} patchless={}",
+            "[DashBoost] 1s | draw-calls={} rendered={} skipped={} resets={} format={} format-misses={} target={}Hz divider-enabled={} cadence-dividing={} source-fps={} geode-cbf={} globed={} patchless={}",
             g_logicCalls,
             g_renderCalls,
             g_skippedDraws,
+            g_stateResets,
             g_formatCalls.exchange(0, std::memory_order_relaxed),
             g_formatMisses.exchange(0, std::memory_order_relaxed),
             currentTargetFPS(),
@@ -354,11 +358,7 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             syncDirectorState(this);
 
             if (g_debuggerEnabled) {
-                log::info(
-                    "[DashBoost] draw state reset | scene-changed={} pause-changed={}",
-                    sceneChanged,
-                    pauseChanged
-                );
+                ++g_stateResets;
                 ++g_renderCalls;
             }
 
@@ -449,39 +449,48 @@ class $modify(DashBoostDirector, cocos2d::CCDirector) {
             }
         }
 
-        // Enter divide mode only when the source is clearly faster than the
-        // display target. Require several samples so one short/jittery frame
-        // cannot make DashBoost throw away a useful display frame.
-        constexpr double kEnterDivideRatio = 0.80;
-        constexpr double kExitDivideRatio = 0.92;
-        constexpr int kCadenceConfirmSamples = 8;
+        // Enter divide mode only after a sustained, unmistakably faster
+        // source cadence. This prevents short scene-transition bursts or
+        // scheduling jitter from stealing a useful 60 Hz display frame.
+        constexpr double kEnterDivideRatio = 0.70;
+        constexpr double kRawFastRatio = 0.80;
+        constexpr double kExitDivideRatio = 0.85;
+        constexpr double kEnterConfirmSeconds = 0.35;
+        constexpr double kExitConfirmSeconds = 0.15;
 
         if (!g_cadenceNeedsDividing) {
-            if (g_sourceIntervalEMA > 0.0 &&
-                g_sourceIntervalEMA < targetDelta * kEnterDivideRatio) {
-                ++g_fastCadenceSamples;
+            bool sustainedFast =
+                g_sourceIntervalEMA > 0.0 &&
+                g_sourceIntervalEMA < targetDelta * kEnterDivideRatio &&
+                elapsed < targetDelta * kRawFastRatio;
+
+            if (sustainedFast) {
+                g_fastCadenceDuration += elapsed;
             }
             else {
-                g_fastCadenceSamples = 0;
+                g_fastCadenceDuration = 0.0;
             }
 
-            if (g_fastCadenceSamples >= kCadenceConfirmSamples) {
+            if (g_fastCadenceDuration >= kEnterConfirmSeconds) {
                 g_cadenceNeedsDividing = true;
-                g_normalCadenceSamples = 0;
+                g_normalCadenceDuration = 0.0;
                 g_drawAccumulator = 0.0;
             }
         }
         else {
-            if (g_sourceIntervalEMA >= targetDelta * kExitDivideRatio) {
-                ++g_normalCadenceSamples;
+            bool backNearTarget =
+                g_sourceIntervalEMA >= targetDelta * kExitDivideRatio;
+
+            if (backNearTarget) {
+                g_normalCadenceDuration += elapsed;
             }
             else {
-                g_normalCadenceSamples = 0;
+                g_normalCadenceDuration = 0.0;
             }
 
-            if (g_normalCadenceSamples >= kCadenceConfirmSamples) {
+            if (g_normalCadenceDuration >= kExitConfirmSeconds) {
                 g_cadenceNeedsDividing = false;
-                g_fastCadenceSamples = 0;
+                g_fastCadenceDuration = 0.0;
                 g_drawAccumulator = 0.0;
                 g_consecutiveSkippedDraws = 0;
             }
