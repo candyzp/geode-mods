@@ -11,8 +11,7 @@ This fork has been rebuilt as one mod instead of a collection.
 
 - Geode 5.10.1
 - Geometry Dash 2.2081
-- Windows x64
-- iOS arm64, including modern Geode iOS builds
+- iOS arm64 only, including modern patchless/JIT-less Geode builds
 
 On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target. The Fast Format hook uses the current Geometry Dash 2.2081 `CCString::initWithFormatAndValist` path, including Geode's patchless static-hook route on iOS.
 
