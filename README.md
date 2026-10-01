@@ -27,7 +27,7 @@ On iOS, DashBoost reads `UIScreen.maximumFramesPerSecond` for the display target
 
 ## CBF compatibility
 
-If `syzzi.click_between_frames` is loaded, DashBoost automatically bypasses Render Divider to avoid overlapping frame/timing behavior. If Globed (`dankmeme.globed2`) is loaded, DashBoost bypasses its own Fast Format hook because Globed already replaces the same CCString formatting path.
+If the Geode mod `syzzi.click_between_frames` is loaded, DashBoost automatically bypasses Render Divider to avoid overlapping frame/timing behavior. RobTop's built-in **Click Between Steps** setting is intentionally left alone and can stay enabled with DashBoost. If Globed (`dankmeme.globed2`) is loaded, DashBoost bypasses its own Fast Format hook because Globed already replaces the same CCString formatting path.
 
 ## Credits
 
