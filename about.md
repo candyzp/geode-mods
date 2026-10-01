@@ -7,10 +7,7 @@ A compact performance mod that merges **Fast Format** and **Draw Divide** into o
 ### Fast Format
 Geometry Dash / Cocos uses formatted strings constantly. The old formatting path can reserve a very large temporary buffer even for tiny strings. DashBoost replaces that hot path with:
 
-1. a 512-byte stack buffer for common short strings
-2. an exact-size dynamic fallback only when the formatted result is larger
-
-This keeps the optimization lightweight while avoiding the old fixed 100 KiB temporary allocation pattern.
+DashBoost now uses a strict 512-byte stack buffer. If a formatted result does not fit, the hook returns failure instead of allocating a larger buffer. This intentionally exposes the real fast-path hit rate during testing.
 
 ### Render Divider
 When logic is updating faster than your screen can display, DashBoost can skip unnecessary scene draws while still updating the scheduler. The render target defaults to the device refresh rate.
@@ -27,6 +24,7 @@ Enable **Debugger** in settings to print live counters once per second. It repor
 - actual scene renders
 - skipped scene draws
 - Fast Format calls
+- Fast Format misses (formats larger than the strict 512-byte path)
 - current visual FPS target
 - whether CBF is loaded
 - whether Geode is running patchless on iOS
