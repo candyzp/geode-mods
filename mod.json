@@ -3,60 +3,65 @@
     "gd": {
         "ios": "2.2081"
     },
-    "id": "candyzp.dashboost",
-    "name": "DashBoost",
-    "version": "v1.0.0",
+    "id": "candyzp.culpritfinder",
+    "name": "Culprit Finder",
+    "version": "v0.1.0",
     "developer": "candyzp",
-    "description": "Merged lightweight performance optimizations for Geometry Dash.",
+    "description": "Diagnostic-only frame pacing investigator. Captures detailed frame spikes, PlayerObject input timing, rolling frame-time history, iOS memory snapshots, thermal state, and evidence-based possible causes. Does not alter gameplay, rendering settings, caching, or prediction.",
     "links": {
-        "source": "https://github.com/candyzp/geode-mods"
+        "source": "https://github.com/candyzp/geode-mods/tree/figuring-out-culprit"
     },
     "tags": [
         "performance",
+        "debug",
         "offline"
     ],
     "settings": {
         "enabled": {
-            "name": "Enabled",
+            "name": "Enable Capture",
             "type": "bool",
             "default": true,
-            "description": "Master switch. Off bypasses Render Divider and disables the Fast Format hook."
+            "description": "Enable frame-time and player-input diagnostics. Does not change gameplay."
         },
-        "fast-format": {
-            "name": "Fast Format",
-            "type": "bool",
-            "default": true,
-            "description": "Reduce temporary allocation overhead from Cocos formatted strings.",
-            "enable-if": "enabled"
-        },
-        "render-divider": {
-            "name": "Render Divider",
-            "type": "bool",
-            "default": true,
-            "description": "Render at the display target while allowing faster logic updates.",
-            "enable-if": "enabled"
-        },
-        "override-visual-fps": {
-            "name": "Override Visual FPS",
-            "type": "bool",
-            "default": false,
-            "description": "Use a custom render target instead of the detected display refresh rate.",
-            "enable-if": "enabled && render-divider"
-        },
-        "visual-fps": {
-            "name": "Visual FPS",
+        "spike-threshold-ms": {
+            "name": "Frame Spike Threshold (ms)",
             "type": "int",
-            "default": 60,
-            "min": 1,
-            "max": 360,
-            "description": "Custom visual FPS target.",
-            "enable-if": "enabled && render-divider && override-visual-fps"
+            "default": 20,
+            "min": 17,
+            "max": 80,
+            "control": {
+                "slider": true
+            },
+            "description": "Capture a frame when its start-to-start gap reaches this threshold. 20 ms is a useful starting point for a 60 Hz device."
         },
-        "debugger": {
-            "name": "Debugger",
+        "show-overlay": {
+            "name": "Show Last Spike Overlay",
             "type": "bool",
-            "default": false,
-            "description": "Log live one-second performance counters to the Geode console."
+            "default": true,
+            "description": "Show a compact six-second in-level summary after a detected spike. The full report is written to the Geode log."
+        },
+        "platform-snapshot": {
+            "name": "Capture iOS Memory and Thermal State",
+            "type": "bool",
+            "default": true,
+            "description": "Sample resident/virtual memory, device physical memory, processor count, and iOS thermal state only when a detailed report is captured."
+        },
+        "frame-timeline": {
+            "name": "Include Recent Frame Timeline",
+            "type": "bool",
+            "default": true,
+            "description": "Include the ten most recent frame gaps, drawScene timings, and engine deltas in detailed spike reports."
+        },
+        "report-cooldown-ms": {
+            "name": "Detailed Log Cooldown (ms)",
+            "type": "int",
+            "default": 300,
+            "min": 0,
+            "max": 2000,
+            "control": {
+                "slider": true
+            },
+            "description": "Avoid flooding the log during a continuous hitch burst. Every spike still updates counters and the overlay; coalesced events are counted."
         }
     }
 }

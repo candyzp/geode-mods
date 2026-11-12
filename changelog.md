@@ -1,21 +1,16 @@
-# v1.0.0
+# v0.1.0
 
-- Rebranded the fork as DashBoost.
-- Removed the unrelated mod collection.
-- Merged Fast Format and Draw Divide into one Geode mod.
-- Updated the project for Geode 5.10.1 and Geometry Dash 2.2081.
-- Made the project iOS arm64-only.
-- Added native iOS refresh-rate detection.
-- Added compatibility bypass for the Geode Click Between Frames mod while allowing RobTop's built-in Click Between Steps to remain enabled.
-- Added Globed-safe Fast Format bypass to avoid double-hooking the same CCString path.
-- Added a real master Enabled toggle.
-- Added live Debugger counters with zero counter overhead while Debugger is disabled.
-- Cached compatibility checks so normal gameplay does not query the Geode loader every frame.
-- Switched Fast Format to the current 2.2081 `CCString::initWithFormatAndValist` hook path.
-- Fixed the old Fast Format varargs handling by avoiding reuse of a consumed va_list.
-- Reworked formatting to use a strict 512-byte stack fast path with no heap-backed fallback.
-- Added a Debugger `format-misses` counter for formats that exceed the strict path.
-
-- Fixed iOS CMake linking by using Geode-compatible plain `target_link_libraries` syntax.
-- Explicitly enabled Objective-C++ for the UIKit refresh-rate bridge.
-- Simplified CI to a single iOS build job.
+- Created the Culprit Finder diagnostic mod on the figuring-out-culprit branch.
+- Added monotonic start-to-start frame interval capture.
+- Added CPU wall-clock timing around CCDirector::drawScene.
+- Added Geometry Dash director delta-time capture.
+- Added a rolling 120-frame history with average, p50, p95, p99, maximum, and spike counts.
+- Added PlayerObject press/release timing with button, player, timestamp, and hook-chain duration.
+- Added recent input correlation and an eight-event input trail.
+- Added iOS process resident/virtual memory, physical memory, thermal state, and processor-count snapshots on detailed spike events.
+- Added cautious possible-cause classification for draw-path, pre-draw, mixed, input-correlated, engine-delta, thermal, and diagnostic-self-overhead clues.
+- Added a hidden-until-needed in-level overlay with a six-second spike summary.
+- Added detailed Geode log reports with a configurable cooldown and recent frame timeline.
+- Measured the profiler's own report cost to flag diagnostic-induced follow-up hitches.
+- Kept gameplay, physics, graphics quality, caching, and prediction untouched.
+- Documented measurement boundaries so timing correlations are not presented as definitive causes.

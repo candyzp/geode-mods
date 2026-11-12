@@ -1,11 +1,11 @@
-name: Build DashBoost iOS
+name: Build Culprit Finder iOS
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: iOS
+    name: iOS arm64
     runs-on: macos-latest
 
     steps:
@@ -17,8 +17,8 @@ jobs:
         with:
           target: iOS
 
-      - name: Upload DashBoost
+      - name: Upload Culprit Finder
         uses: actions/upload-artifact@v7
         with:
-          name: DashBoost-iOS
-          path: ${{ steps.build.outputs.build-output }}/*.geode
+          name: CulpritFinder-iOS
+          path: \${{ steps.build.outputs.build-output }}/*.geode
