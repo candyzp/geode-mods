@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
+#include <cstring>
 #include <cstdint>
 #include <deque>
 #include <filesystem>
@@ -951,8 +952,8 @@ namespace {
 
                     records.push_back({
                         target,
-                        std::string(mod->getID()),
-                        std::string(mod->getName()),
+                        std::string(mod->getID().view()),
+                        std::string(mod->getName().view()),
                         std::string(hook->getDisplayName()),
                         modifyName.has_value()
                             ? std::string(modifyName.value())

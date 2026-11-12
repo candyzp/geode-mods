@@ -21,7 +21,7 @@ jobs:
           target: iOS
           sdk: given
           bindings: geode-sdk/bindings
-          bindings-ref: cac7b26495124025212d0f5e4cf82bb43b8162e8
+          bindings-ref: 6eb417ad2810fe43188bb94b6097562b201db0fa
 
       - name: Upload Culprit Finder
         uses: actions/upload-artifact@v7
