@@ -19,6 +19,9 @@ jobs:
         uses: geode-sdk/build-geode-mod@main
         with:
           target: iOS
+          sdk: given
+          bindings: geode-sdk/bindings
+          bindings-ref: d641858f3e1cd2c6d86013c799f224ebdb8ec1cd
 
       - name: Upload Culprit Finder
         uses: actions/upload-artifact@v7
