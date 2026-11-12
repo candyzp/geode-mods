@@ -16,7 +16,7 @@ It does not attempt to improve FPS. It does not change physics, input behavior, 
 ### Per-frame timing
 
 - Start-to-start frame arrival interval from a monotonic clock.
-- Wall-clock time spent inside the hooked \`CCDirector::drawScene()\` call.
+- Wall-clock time spent inside the hooked `CCDirector::drawScene()` call.
 - Geometry Dash / Cocos director delta time.
 - Expected frame budget based on the iOS display refresh rate.
 - Instantaneous FPS estimate derived from the frame interval.
@@ -25,7 +25,7 @@ It does not attempt to improve FPS. It does not change physics, input behavior, 
 
 ### Player input correlation
 
-Hooks \`PlayerObject::pushButton(PlayerButton)\` and \`releaseButton(PlayerButton)\` for the active level's player objects.
+Hooks `PlayerObject::pushButton(PlayerButton)` and `releaseButton(PlayerButton)` for the active level's player objects.
 
 For each observed event it records:
 
