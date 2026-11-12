@@ -1032,8 +1032,8 @@ namespace {
                 "HIGH CONFIDENCE - PROFILER SELF-OVERHEAD CONTRIBUTED: the previous "
                 "report took {:.3f}ms on the game thread. Raw gap was {:.3f}ms; "
                 "subtracting measured profiler work gives {:.3f}ms. File writing is "
-                "asynchronous; this cost is formatting, hook inventory, queueing, "
-                "and report formatting, hook inventory, and queueing.",
+                "asynchronous; this cost is report formatting, hook inventory, "
+                "and queueing.",
                 sample.priorDiagnosticMs,
                 sample.rawGapMs,
                 sample.adjustedGapMs
