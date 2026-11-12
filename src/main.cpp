@@ -213,6 +213,8 @@ namespace {
         std::string vendor = "unknown";
         std::string renderer = "unknown";
         std::string version = "unknown";
+        std::uint64_t disjointCount = 0;
+        std::uint64_t skippedQueries = 0;
         std::array<GpuQuerySlot, kGpuQueryCount> slots{};
     };
 
