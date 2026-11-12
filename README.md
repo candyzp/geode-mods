@@ -58,7 +58,7 @@ On a detailed report, Culprit Finder enumerates Geode's loaded mods and their re
 
 - Mod name and ID.
 - Hook display name.
-- Modify class name (when available).
+- Modify class name is reported as unavailable because Geode 5.10.1 does not expose it through the public Hook API.
 - Enabled/disabled state.
 - Hook priority.
 - Target address.
