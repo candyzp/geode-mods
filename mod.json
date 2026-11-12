@@ -5,9 +5,9 @@
     },
     "id": "candyzp.culpritfinder",
     "name": "Culprit Finder",
-    "version": "v0.1.0",
+    "version": "v0.2.0",
     "developer": "candyzp",
-    "description": "Diagnostic-only frame pacing investigator. Captures detailed frame spikes, PlayerObject input timing, rolling frame-time history, iOS memory snapshots, thermal state, and evidence-based possible causes. Does not alter gameplay, rendering settings, caching, or prediction.",
+    "description": "Diagnostic-only frame pacing investigator. Captures CPU draw and update hook-chain timings, asynchronous GPU timer-query data when supported, PlayerObject input timing, registered hook inventory, iOS memory and thermal snapshots, and detailed spike reports in its own mod save folder. Does not alter gameplay.",
     "links": {
         "source": "https://github.com/candyzp/geode-mods/tree/figuring-out-culprit"
     },
@@ -28,7 +28,7 @@
             "type": "int",
             "default": 20,
             "min": 17,
-            "max": 80,
+            "max": 100,
             "control": {
                 "slider": true
             },
@@ -38,22 +38,34 @@
             "name": "Show Last Spike Overlay",
             "type": "bool",
             "default": true,
-            "description": "Show a compact six-second in-level summary after a detected spike. The full report is written to the Geode log."
+            "description": "Show a compact seven-second in-level summary after a detected spike. The full report is written to CulpritFinder-Capture.txt in this mod's save folder."
+        },
+        "gpu-timer": {
+            "name": "GPU Timer Query",
+            "type": "bool",
+            "default": true,
+            "description": "Use asynchronous GL_EXT_disjoint_timer_query if the active iOS OpenGL ES renderer advertises it and exports the required functions. No glFinish or synchronous GPU wait is used. If unavailable, the report says so."
         },
         "platform-snapshot": {
             "name": "Capture iOS Memory and Thermal State",
             "type": "bool",
             "default": true,
-            "description": "Sample resident/virtual memory, device physical memory, processor count, and iOS thermal state only when a detailed report is captured."
+            "description": "Sample resident/virtual memory, device physical memory, processor count, and iOS thermal state when a detailed spike report is captured."
+        },
+        "hook-inventory": {
+            "name": "Include Hook Inventory",
+            "type": "bool",
+            "default": true,
+            "description": "List enabled and disabled Geode hooks attached to the monitored function addresses, including mod ID, display name, modify class, address, and priority. Function timers measure the downstream hook chain as a whole."
         },
         "frame-timeline": {
             "name": "Include Recent Frame Timeline",
             "type": "bool",
             "default": true,
-            "description": "Include the ten most recent frame gaps, drawScene timings, and engine deltas in detailed spike reports."
+            "description": "Include the twelve most recent frame gaps, CPU draw timings, engine deltas, and completed GPU timings in detailed reports."
         },
         "report-cooldown-ms": {
-            "name": "Detailed Log Cooldown (ms)",
+            "name": "Detailed Report Cooldown (ms)",
             "type": "int",
             "default": 300,
             "min": 0,
@@ -61,7 +73,7 @@
             "control": {
                 "slider": true
             },
-            "description": "Avoid flooding the log during a continuous hitch burst. Every spike still updates counters and the overlay; coalesced events are counted."
+            "description": "Avoid flooding the capture file during a continuous hitch burst. Every spike still gets a compact file entry and increments the counter; coalesced events are counted."
         }
     }
 }
