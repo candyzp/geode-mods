@@ -1,11 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/modify/GameObject.hpp>
-#include <Geode/modify/PlayerObject.hpp>
 #include <Geode/binding/PlayLayer.hpp>
-#include <Geode/binding/GameObject.hpp>
-#include <Geode/binding/PlayerObject.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/loader/Hook.hpp>
 #include <Geode/loader/Loader.hpp>
@@ -760,7 +756,7 @@ namespace {
                     std::max(stats.maxEngineDeltaMs, sample.engineDeltaMs);
             }
 
-            if (sample.gapSpike || sample.drawSpike) {
+            if (sample.gapSpike) {
                 ++stats.spikes;
             }
         }
@@ -846,7 +842,7 @@ namespace {
                 sample.gpuMs >= 0.0
                     ? fmt::format("{:.3f}ms@F{}", sample.gpuMs, sample.gpuFrame)
                     : "pending/unavailable",
-                (sample.gapSpike || sample.drawSpike) ? " SPIKE" : ""
+                sample.gapSpike ? " SPIKE" : ""
             );
         }
 
@@ -1020,13 +1016,6 @@ namespace {
         bool platformCaptured
     ) {
         const double budget = frameBudgetMs();
-        const auto& playUpdate =
-            sample.calls[static_cast<std::size_t>(TimedFunction::PlayLayerUpdate)];
-        const auto& objectUpdate =
-            sample.calls[static_cast<std::size_t>(TimedFunction::GameObjectUpdate)];
-        const auto& playerUpdate =
-            sample.calls[static_cast<std::size_t>(TimedFunction::PlayerObjectUpdate)];
-
         std::string reasons;
 
         auto addReason = [&](std::string value) {
@@ -1083,68 +1072,11 @@ namespace {
             ));
         }
 
-        if (playUpdate.totalMs >= budget * 0.30 ||
-            playUpdate.maxMs >= budget * 0.20) {
-            addReason(fmt::format(
-                "PLAYLAYER UPDATE - PlayLayer::update used {:.3f}ms total "
-                "(max call {:.3f}ms) in this frame. Inspect hooks listed for "
-                "PlayLayer::update.",
-                playUpdate.totalMs,
-                playUpdate.maxMs
-            ));
-        }
-
-        if (objectUpdate.totalMs >= budget * 0.30 ||
-            objectUpdate.maxMs >= budget * 0.15) {
-            addReason(fmt::format(
-                "GAME OBJECT UPDATE WORKLOAD - {} GameObject::update call(s) "
-                "used {:.3f}ms total (max individual call {:.3f}ms; {} calls "
-                "were >=1ms). This is a strong object-update workload clue.",
-                objectUpdate.calls,
-                objectUpdate.totalMs,
-                objectUpdate.maxMs,
-                objectUpdate.overOneMs
-            ));
-        }
-
-        if (playerUpdate.totalMs >= 0.75 ||
-            playerUpdate.maxMs >= 0.50) {
-            addReason(fmt::format(
-                "PLAYER UPDATE - PlayerObject::update used {:.3f}ms total "
-                "(max call {:.3f}ms). Check player-update hooks and downstream logic.",
-                playerUpdate.totalMs,
-                playerUpdate.maxMs
-            ));
-        }
-
-        if (inputStats.lastEventAgeMs >= 0.0 &&
-            inputStats.lastEventAgeMs <= kInputCorrelationWindowMs) {
-            addReason(fmt::format(
-                "INPUT CORRELATION - PlayerObject {} button {} for P{} was "
-                "{:.1f}ms before the hitch; its measured full hook-chain time was "
-                "{:.3f}ms. Correlation does not prove the click caused the hitch.",
-                inputStats.lastDown ? "press" : "release",
-                inputStats.lastButton,
-                inputStats.lastPlayer2 ? 2 : 1,
-                inputStats.lastEventAgeMs,
-                inputStats.lastHookMs
-            ));
-        }
-        else {
-            addReason(
-                "NO RECENT PLAYER INPUT - no PlayerObject press/release hook was "
-                "observed in the 150ms before this hitch."
-            );
-        }
-
-        if (inputStats.maxHook1sMs >= 1.0) {
-            addReason(fmt::format(
-                "SLOW INPUT HOOK CHAIN - a PlayerObject press/release chain reached "
-                "{:.3f}ms within the last second. This includes the downstream "
-                "detour chain, not one specific mod.",
-                inputStats.maxHook1sMs
-            ));
-        }
+        addReason(
+            "GAMEPLAY UPDATE AND INPUT HOOKS DISABLED - this safe observer does not "
+            "detour PlayerObject, GameObject, or PlayLayer::update. It cannot attribute "
+            "a gameplay-object or collision problem to an individual mod."
+        );
 
         if (sample.engineDeltaMs >= budget * 1.50) {
             addReason(fmt::format(
@@ -1218,6 +1150,7 @@ namespace {
         }
 
         (void) frameStats;
+        (void) inputStats;
         return reasons;
     }
 
@@ -1253,12 +1186,11 @@ namespace {
             "p95={:.3f}ms | p99={:.3f}ms | max-gap={:.3f}ms | "
             "avg-drawScene={:.3f}ms | max-drawScene={:.3f}ms | "
             "max-engine-delta={:.3f}ms | spikes-in-window={}\n"
-            "CALLS / CPU HOOK-CHAIN TIMINGS FOR THIS FRAME:\n{}\n"
+            "GAMEPLAY HOOKS: disabled in safe-observer mode; no PlayerObject, "
+            "GameObject, or PlayLayer::update detours are installed.\n"
             "POSSIBLE CAUSES / EVIDENCE:\n{}\n"
-            "INPUT COUNTS: events-250ms={} | events-1s={} | presses-1s={} | "
-            "releases-1s={} | last-event-age={:.2f}ms | last-press-age={:.2f}ms | "
-            "last-input-hook={:.3f}ms | max-input-hook-1s={:.3f}ms\n"
-            "RECENT INPUT TRAIL:\n{}\n"
+            "INPUT MONITORING: disabled in safe-observer mode; no PlayerObject "
+            "input detours are installed.\n"
             "GPU TIMER: status={} | extension-advertised={} | completed-samples={} | "
             "latest={:.4f}ms @ frame {} | avg={:.4f}ms | p95={:.4f}ms | "
             "max={:.4f}ms | disjoint-events={} | skipped-queries={}\n"
@@ -1291,17 +1223,7 @@ namespace {
             frameStats.maxDrawSceneMs,
             frameStats.maxEngineDeltaMs,
             frameStats.spikes,
-            buildCallTimingReport(sample.calls),
             classifySpike(sample, frameStats, gpuStats, inputStats, platform, platformCaptured),
-            inputStats.events250ms,
-            inputStats.events1s,
-            inputStats.presses1s,
-            inputStats.releases1s,
-            inputStats.lastEventAgeMs,
-            inputStats.lastPressAgeMs,
-            inputStats.lastHookMs,
-            inputStats.maxHook1sMs,
-            buildInputTrail(nowSeconds),
             g_gpu.status,
             g_gpu.extensionAdvertised,
             gpuStats.samples,
@@ -1459,8 +1381,6 @@ namespace {
             platform = geode::culpritfinder::collectPlatformSnapshot();
         }
 
-        updateOverlay(sample, inputStats, gpuStats, nowSeconds);
-
         if (!detailedReportDue) {
             ++g_coalescedReports;
 
@@ -1581,9 +1501,10 @@ namespace {
             appendFileRecord(fmt::format(
                 "======================================================================\n"
                 "CULPRIT FINDER SESSION START\n"
-                "Version: 0.2.0\n"
+                "Version: 0.2.0-safe-observer-patch\n"
                 "Target: Geometry Dash 2.2081 / Geode 5.10.1 / iOS arm64\n"
                 "Capture file: {}\n"
+                "SAFE OBSERVER MODE: no PlayerObject, GameObject, or PlayLayer::update detours; no gameplay overlay; no hook-priority changes.\n"
                 "No gameplay, physics, graphics quality, cache, or prediction "
                 "settings are modified by this diagnostic mod.\n"
                 "GPU timer query uses asynchronous GL_EXT_disjoint_timer_query "
@@ -1670,120 +1591,7 @@ namespace {
     }
 }
 
-// PlayerObject calls can be generated by other mods too. They are measured as
-// the PlayerObject input path, not guaranteed physical touchscreen events.
-class $modify(CulpritFinderPlayer, PlayerObject) {
-    static void onModify(auto& self) {
-        registerOwnHookAddress(
-            self, "PlayerObject::update", HookTarget::PlayerUpdate
-        );
-        registerOwnHookAddress(
-            self, "PlayerObject::pushButton", HookTarget::PlayerPress
-        );
-        registerOwnHookAddress(
-            self, "PlayerObject::releaseButton", HookTarget::PlayerRelease
-        );
-
-        setFirstPriority(self, "PlayerObject::update");
-        setFirstPriority(self, "PlayerObject::pushButton");
-        setFirstPriority(self, "PlayerObject::releaseButton");
-    }
-
-    void update(float dt) {
-        const auto started = Clock::now();
-        auto* playLayer = PlayLayer::get();
-        const bool isTrackedPlayer =
-            playLayer && (this == playLayer->m_player1 || this == playLayer->m_player2);
-
-        PlayerObject::update(dt);
-
-        if (isTrackedPlayer) {
-            recordTimedCall(
-                TimedFunction::PlayerObjectUpdate,
-                milliseconds(Clock::now() - started)
-            );
-        }
-    }
-
-    bool pushButton(PlayerButton button) {
-        const auto started = Clock::now();
-        const double timestamp = secondsSinceBoot(started);
-
-        auto* playLayer = PlayLayer::get();
-        const bool isPlayer1 = playLayer && this == playLayer->m_player1;
-        const bool isPlayer2 = playLayer && this == playLayer->m_player2;
-        const bool isTrackedPlayer = isPlayer1 || isPlayer2;
-
-        const bool result = PlayerObject::pushButton(button);
-        const double elapsedMs = milliseconds(Clock::now() - started);
-
-        if (isTrackedPlayer) {
-            recordTimedCall(TimedFunction::PlayerPress, elapsedMs);
-            recordInput(
-                timestamp,
-                static_cast<int>(button),
-                true,
-                isPlayer2,
-                elapsedMs
-            );
-        }
-
-        return result;
-    }
-
-    bool releaseButton(PlayerButton button) {
-        const auto started = Clock::now();
-        const double timestamp = secondsSinceBoot(started);
-
-        auto* playLayer = PlayLayer::get();
-        const bool isPlayer1 = playLayer && this == playLayer->m_player1;
-        const bool isPlayer2 = playLayer && this == playLayer->m_player2;
-        const bool isTrackedPlayer = isPlayer1 || isPlayer2;
-
-        const bool result = PlayerObject::releaseButton(button);
-        const double elapsedMs = milliseconds(Clock::now() - started);
-
-        if (isTrackedPlayer) {
-            recordTimedCall(TimedFunction::PlayerRelease, elapsedMs);
-            recordInput(
-                timestamp,
-                static_cast<int>(button),
-                false,
-                isPlayer2,
-                elapsedMs
-            );
-        }
-
-        return result;
-    }
-};
-
-class $modify(CulpritFinderGameObject, GameObject) {
-    static void onModify(auto& self) {
-        registerOwnHookAddress(
-            self, "GameObject::update", HookTarget::GameObjectUpdate
-        );
-        setFirstPriority(self, "GameObject::update");
-    }
-
-    void update(float dt) {
-        const auto started = Clock::now();
-        GameObject::update(dt);
-        recordTimedCall(
-            TimedFunction::GameObjectUpdate,
-            milliseconds(Clock::now() - started)
-        );
-    }
-};
-
 class $modify(CulpritFinderPlayLayer, PlayLayer) {
-    static void onModify(auto& self) {
-        registerOwnHookAddress(
-            self, "PlayLayer::update", HookTarget::PlayLayerUpdate
-        );
-        setFirstPriority(self, "PlayLayer::update");
-    }
-
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) {
             return false;
@@ -1797,8 +1605,6 @@ class $modify(CulpritFinderPlayLayer, PlayLayer) {
             ? std::string(level->m_levelName)
             : std::string("unknown");
 
-        attachOverlay(this);
-
         appendFileRecord(fmt::format(
             "\n\nLEVEL START: {} | id={} | target={:.1f}Hz | threshold={}ms",
             g_levelName,
@@ -1808,15 +1614,6 @@ class $modify(CulpritFinderPlayLayer, PlayLayer) {
         ));
 
         return true;
-    }
-
-    void update(float dt) {
-        const auto started = Clock::now();
-        PlayLayer::update(dt);
-        recordTimedCall(
-            TimedFunction::PlayLayerUpdate,
-            milliseconds(Clock::now() - started)
-        );
     }
 
     void onQuit() {
@@ -1843,7 +1640,6 @@ class $modify(CulpritFinderDirector, cocos2d::CCDirector) {
         registerOwnHookAddress(
             self, "CCDirector::drawScene", HookTarget::DirectorDraw
         );
-        setFirstPriority(self, "CCDirector::drawScene");
     }
 
     void drawScene() {
@@ -1939,7 +1735,7 @@ class $modify(CulpritFinderDirector, cocos2d::CCDirector) {
         const bool longInterruption = rawGapMs >= 2000.0;
         const bool gapSpike = rawGapMs >= threshold;
         const bool drawSpike = drawSceneMs >= budget;
-        const bool isSpike = gapSpike || drawSpike || longInterruption;
+        const bool isSpike = gapSpike || longInterruption;
 
         FrameSample sample{
             g_levelFrame,
@@ -1957,11 +1753,6 @@ class $modify(CulpritFinderDirector, cocos2d::CCDirector) {
         };
 
         recordFrame(sample);
-
-        if (g_overlayLabel && g_overlayLabel->isVisible() &&
-            nowSeconds >= g_overlayExpiresAt) {
-            g_overlayLabel->setVisible(false);
-        }
 
         if (isSpike) {
             const auto diagnosticStarted = Clock::now();
