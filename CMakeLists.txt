@@ -21,10 +21,10 @@ if (NOT DEFINED ENV{GEODE_SDK})
     message(FATAL_ERROR "Unable to find Geode SDK. Set GEODE_SDK to your Geode SDK path.")
 endif()
 
-add_subdirectory($ENV{GEODE_SDK} \${CMAKE_CURRENT_BINARY_DIR}/geode)
+add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 
 find_library(UIKIT_FRAMEWORK UIKit REQUIRED)
 find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
-target_link_libraries(CulpritFinder \${UIKIT_FRAMEWORK} \${FOUNDATION_FRAMEWORK})
+target_link_libraries(CulpritFinder ${UIKIT_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
 
 setup_geode_mod(CulpritFinder)
