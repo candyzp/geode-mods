@@ -1,16 +1,15 @@
-# v0.1.0
+# v0.2.0
 
-- Created the Culprit Finder diagnostic mod on the figuring-out-culprit branch.
-- Added monotonic start-to-start frame interval capture.
-- Added CPU wall-clock timing around CCDirector::drawScene.
-- Added Geometry Dash director delta-time capture.
-- Added a rolling 120-frame history with average, p50, p95, p99, maximum, and spike counts.
-- Added PlayerObject press/release timing with button, player, timestamp, and hook-chain duration.
-- Added recent input correlation and an eight-event input trail.
-- Added iOS process resident/virtual memory, physical memory, thermal state, and processor-count snapshots on detailed spike events.
-- Added cautious possible-cause classification for draw-path, pre-draw, mixed, input-correlated, engine-delta, thermal, and diagnostic-self-overhead clues.
-- Added a hidden-until-needed in-level overlay with a six-second spike summary.
-- Added detailed Geode log reports with a configurable cooldown and recent frame timeline.
-- Measured the profiler's own report cost to flag diagnostic-induced follow-up hitches.
-- Kept gameplay, physics, graphics quality, caching, and prediction untouched.
-- Documented measurement boundaries so timing correlations are not presented as definitive causes.
+- Replaced Geode-log-only reports with an append-only capture file in the mod's own save directory: CulpritFinder-Capture.txt.
+- Added asynchronous background file writing so spike reports do not synchronously hit the game thread with disk I/O.
+- Added runtime OpenGL ES renderer/vendor/version detection.
+- Added optional asynchronous GL_EXT_disjoint_timer_query GPU measurements when the extension and required entry points are actually available.
+- Avoided glFinish and synchronous GPU query waits.
+- Added delayed GPU-result records keyed to the original frame number.
+- Added first-priority CPU hook-chain timing for PlayLayer::update, GameObject::update, PlayerObject::update, PlayerObject::pushButton, and PlayerObject::releaseButton.
+- Added per-frame call counts, totals, averages, max individual call time, and calls >=1ms.
+- Added registered hook inventory for enabled/disabled hooks attached to monitored function addresses, including mod ID/name, hook name, modify class, priority, and target address.
+- Kept CCDirector drawScene wall-clock timing and rolling p50/p95/p99 frame-gap history.
+- Kept iOS resident/virtual memory, thermal-state, processor-count snapshots.
+- Added profiler self-overhead measurement and raw/adjusted frame gap fields.
+- Kept the mod diagnostic-only: no gameplay, physics, prediction, cache, or graphics-quality changes.
