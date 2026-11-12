@@ -2,8 +2,8 @@
 
 A diagnostic-only iOS Geode mod for Geometry Dash 2.2081.
 
-Culprit Finder investigates micro-stutters that occur even when the FPS counter stays close to the target. It records frame arrival gaps, drawScene wall time, engine delta, rolling frame-time percentiles, player button press/release timing, and an iOS memory/thermal snapshot on detailed spike events.
+Culprit Finder captures frame pacing, CPU draw/update hook-chain time, PlayerObject input timing, registered hooks attached to monitored function addresses, iOS memory/thermal snapshots, and asynchronous GPU timer-query data when the active OpenGL ES renderer supports it.
 
-The mod does not change gameplay or attempt to optimize anything. Its purpose is to distinguish a slow draw path from a stall that happened before drawing, then provide timing evidence and cautious possible-cause notes in the Geode log.
+The primary output is an append-only text file, CulpritFinder-Capture.txt, in this mod's writable Geode save directory. It does not use the Geode log as its report store and does not alter gameplay.
 
-See README.md for captured fields, settings, interpretation, and limitations.
+See README.md for the measured fields, hook-chain limits, GPU-query availability, and test procedure.
