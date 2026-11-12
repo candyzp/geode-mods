@@ -948,16 +948,12 @@ namespace {
                         continue;
                     }
 
-                    auto modifyName = hook->getModifyClassName();
-
                     records.push_back({
                         target,
                         std::string(mod->getID().view()),
                         std::string(mod->getName().view()),
                         std::string(hook->getDisplayName()),
-                        modifyName.has_value()
-                            ? std::string(modifyName.value())
-                            : std::string("manual/unknown"),
+                        "not exposed by Geode 5.10.1",
                         address,
                         hook->getPriority(),
                         hook->isEnabled()
