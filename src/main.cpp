@@ -998,9 +998,9 @@ namespace {
 
         report +=
             "  Interpretation: enabled hooks registered at the same target address "
-            "are in that function's detour chain. Culprit Finder sets its own hooks "
-            "to Priority::First, so the function-level timers include the downstream "
-            "hook chain and original function. Geode's public API does not expose an "
+            "are in that function's detour chain. The safe observer does not change "
+            "hook priority. Function timers include the hook calls that run inside "
+            "the observed function, but Geode's public API does not expose an "
             "individual runtime stopwatch for every third-party hook callback; "
             "these entries identify chain participants, not per-mod execution costs.";
 
@@ -1033,7 +1033,7 @@ namespace {
                 "report took {:.3f}ms on the game thread. Raw gap was {:.3f}ms; "
                 "subtracting measured profiler work gives {:.3f}ms. File writing is "
                 "asynchronous; this cost is formatting, hook inventory, queueing, "
-                "and overlay work.",
+                "and report formatting, hook inventory, and queueing.",
                 sample.priorDiagnosticMs,
                 sample.rawGapMs,
                 sample.adjustedGapMs
@@ -1083,18 +1083,6 @@ namespace {
                 "ENGINE DELTA JUMP - Cocos director delta reached {:.3f}ms.",
                 sample.engineDeltaMs
             ));
-        }
-
-        if (sample.adjustedGapMs >= static_cast<double>(g_spikeThresholdMs) &&
-            sample.drawSceneMs < budget * 0.40 &&
-            playUpdate.totalMs < budget * 0.30 &&
-            objectUpdate.totalMs < budget * 0.30) {
-            addReason(
-                "PRE-DRAW / SCHEDULER SUSPECT - the frame arrived late, but the "
-                "measured PlayLayer/GameObject update and drawScene hooks were not "
-                "large enough to explain it. Possible OS scheduling, other "
-                "unmonitored callbacks, or work outside the instrumented functions."
-            );
         }
 
         if (platformCaptured && platform.thermalState >= 2) {
